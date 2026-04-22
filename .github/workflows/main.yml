@@ -1,19 +1,36 @@
-name: CI - Docker 빌드
+name: CI/CD - ECR 자동 배포
 
 on:
   push:
     branches: [ "main" ]
 
+env:
+  AWS_REGION: ap-northeast-2
+  ECR_REPOSITORY: cicd-test
+
 jobs:
-  build:
+  build-and-push:
     runs-on: ubuntu-latest
 
     steps:
       - name: 코드 가져오기
         uses: actions/checkout@v3
 
-      - name: Docker 이미지 빌드
-        run: docker build -t cicd-test .
+      - name: AWS 로그인
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: 빌드 성공 확인
-        run: echo "Docker 이미지 빌드 완료!"
+      - name: ECR 로그인
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Docker 이미지 빌드 & ECR push
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          echo "이미지 push 완료!"
